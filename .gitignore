@@ -1,0 +1,39 @@
+# AI tooling (never commit)
+.claude/
+CLAUDE.md
+
+# Internal strategy/research docs (not for public repo)
+docs/*.docx
+
+# IDE
+.vscode/
+.idea/
+
+# Node / TypeScript (execution-client, dashboard)
+node_modules/
+dist/
+.next/
+out/
+*.log
+npm-debug.log*
+
+# Java / Spring Boot (signal-engine)
+target/
+*.class
+.mvn/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Rust / Anchor
+/programs/**/target/
+.anchor/
+test-ledger/
+
+# Env / secrets
+.env
+.env.*
+*.pem
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db

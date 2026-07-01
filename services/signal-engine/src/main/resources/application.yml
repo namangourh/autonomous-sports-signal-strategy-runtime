@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: signal-engine
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+  datasource:
+    url: ${ORACLE_DB_URL:jdbc:oracle:thin:@localhost:1521/FREEPDB1}
+    username: ${ORACLE_DB_USER:assr}
+    password: ${ORACLE_DB_PASSWORD:}
+    driver-class-name: oracle.jdbc.OracleDriver
+
+txline:
+  base-url: ${TXLINE_BASE_URL:https://txline-docs.txodds.com/api}
+  api-key: ${TXLINE_API_KEY:}
+  poll-interval-ms: ${TXLINE_POLL_INTERVAL_MS:60000}
