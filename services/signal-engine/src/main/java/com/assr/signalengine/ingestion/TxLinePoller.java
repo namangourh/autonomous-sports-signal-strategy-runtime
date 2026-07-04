@@ -22,11 +22,20 @@ import java.util.List;
  *
  * Fixture list and per-fixture polling are intentionally separated so a
  * single stale/slow fixture doesn't block the others.
+ *
+ * When {@code txline.simulate=true} (no TxLINE API key available yet), this
+ * generates a synthetic odds snapshot with a deliberate value-bet edge
+ * instead of calling the real API, so the rest of the pipeline (Kafka →
+ * strategy detection → on-chain proof) can be proven end-to-end. The
+ * oracle_hash is still computed for real over the synthetic bytes — only the
+ * data source is fake, not the proof mechanics. Remove once real TxLINE
+ * credentials are wired up.
  */
 @Component
 public class TxLinePoller {
 
     private static final Logger log = LoggerFactory.getLogger(TxLinePoller.class);
+    private static final String SIMULATED_FIXTURE_ID = "sim-wc2026-fixture-001";
 
     private final TxLineProperties properties;
     private final RestClient restClient;
@@ -47,6 +56,11 @@ public class TxLinePoller {
 
     @Scheduled(fixedDelayString = "${txline.poll-interval-ms:60000}")
     public void pollActiveFixtures() {
+        if (properties.isSimulate()) {
+            publishSimulatedOddsSnapshot();
+            return;
+        }
+
         List<String> fixtureIds = fetchActiveFixtureIds();
         for (String fixtureId : fixtureIds) {
             try {
@@ -73,6 +87,24 @@ public class TxLinePoller {
         if (rawBody == null) {
             return;
         }
+        publishEvent(fixtureId, eventType, rawBody);
+    }
+
+    /**
+     * Synthetic 2-book odds snapshot where TxLINE's own home price implies a
+     * lower probability than the de-vigged Pinnacle line — i.e. an intentional
+     * value bet for ValueBetDetector to catch (edge ≈ 3.6%, above its 3% threshold).
+     */
+    private void publishSimulatedOddsSnapshot() {
+        String payload = """
+                {"books":[
+                  {"name":"pinnacle","home":2.00,"draw":3.20,"away":4.00},
+                  {"name":"txline","home":2.30,"draw":3.20,"away":4.00}
+                ]}""";
+        publishEvent(SIMULATED_FIXTURE_ID, "ODDS_SNAPSHOT", payload.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void publishEvent(String fixtureId, String eventType, byte[] rawBody) {
         long timestampMillis = Instant.now().toEpochMilli();
         String oracleHash = OracleHashUtil.compute(fixtureId, rawBody, timestampMillis);
         RawTxLineEvent event = new RawTxLineEvent(

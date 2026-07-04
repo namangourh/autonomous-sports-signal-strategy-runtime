@@ -11,6 +11,8 @@ public class TxLineProperties {
     private String oddsPath = "/odds";
     private String scoresPath = "/scores";
     private long pollIntervalMs = 60_000;
+    /** Generates synthetic fixtures/odds instead of calling the real API — see SimulatedFixtureFeed. */
+    private boolean simulate = false;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -58,5 +60,13 @@ public class TxLineProperties {
 
     public void setPollIntervalMs(long pollIntervalMs) {
         this.pollIntervalMs = pollIntervalMs;
+    }
+
+    public boolean isSimulate() {
+        return simulate;
+    }
+
+    public void setSimulate(boolean simulate) {
+        this.simulate = simulate;
     }
 }
