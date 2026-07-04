@@ -27,6 +27,7 @@ pub mod assr_v1 {
         performance.win_count = 0;
         performance.loss_count = 0;
         performance.max_drawdown_bps = 0;
+        performance.peak_pnl_usdc = 0;
         performance.last_updated = Clock::get()?.unix_timestamp;
         performance.bump = ctx.bumps.performance;
 
@@ -66,8 +67,43 @@ pub mod assr_v1 {
         signal.signal_timestamp = Clock::get()?.unix_timestamp;
         signal.execution_price = execution_price;
         signal.tx_signature = tx_signature;
+        signal.settled = false;
         signal.bump = ctx.bumps.signal_log;
 
+        Ok(())
+    }
+
+    /// Settles a previously logged signal's realized P&L against the
+    /// agent's performance record. Each signal can only be settled once.
+    pub fn update_performance(ctx: Context<UpdatePerformance>, realized_pnl_usdc: i64) -> Result<()> {
+        require!(!ctx.accounts.signal_log.settled, AssrError::SignalAlreadySettled);
+
+        let performance = &mut ctx.accounts.performance;
+        performance.total_signals += 1;
+        performance.cumulative_pnl_usdc += realized_pnl_usdc;
+        if realized_pnl_usdc >= 0 {
+            performance.win_count += 1;
+        } else {
+            performance.loss_count += 1;
+        }
+
+        performance.peak_pnl_usdc = performance.peak_pnl_usdc.max(performance.cumulative_pnl_usdc);
+        let drawdown = (performance.peak_pnl_usdc - performance.cumulative_pnl_usdc).max(0);
+        let reference_base = performance.peak_pnl_usdc.max(1);
+        let drawdown_bps = ((drawdown * 10_000) / reference_base).min(u16::MAX as i64) as u16;
+        performance.max_drawdown_bps = performance.max_drawdown_bps.max(drawdown_bps);
+        performance.last_updated = Clock::get()?.unix_timestamp;
+
+        ctx.accounts.signal_log.settled = true;
+
+        Ok(())
+    }
+
+    /// One-way kill switch: pauses the agent so log_signal starts rejecting
+    /// new signals. There is no resume instruction in this version — the
+    /// operator re-initializes with a fresh agent if the pause was a mistake.
+    pub fn emergency_pause(ctx: Context<EmergencyPause>) -> Result<()> {
+        ctx.accounts.agent_config.active = false;
         Ok(())
     }
 }
@@ -97,6 +133,7 @@ pub struct PerformancePda {
     pub win_count: u64,
     pub loss_count: u64,
     pub max_drawdown_bps: u16,
+    pub peak_pnl_usdc: i64,
     pub last_updated: i64,
     pub bump: u8,
 }
@@ -115,6 +152,7 @@ pub struct SignalLog {
     pub signal_timestamp: i64,
     pub execution_price: u64,
     pub tx_signature: Pubkey,
+    pub settled: bool,
     pub bump: u8,
 }
 
@@ -169,6 +207,44 @@ pub struct LogSignal<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct UpdatePerformance<'info> {
+    pub authority: Signer<'info>,
+
+    #[account(
+        seeds = [b"agent", authority.key().as_ref()],
+        bump = agent_config.bump,
+        has_one = authority,
+    )]
+    pub agent_config: Account<'info, AgentConfig>,
+
+    #[account(
+        mut,
+        seeds = [b"perf", authority.key().as_ref()],
+        bump = performance.bump,
+    )]
+    pub performance: Account<'info, PerformancePda>,
+
+    #[account(
+        mut,
+        constraint = signal_log.agent == authority.key() @ AssrError::SignalNotOwnedByAgent,
+    )]
+    pub signal_log: Account<'info, SignalLog>,
+}
+
+#[derive(Accounts)]
+pub struct EmergencyPause<'info> {
+    pub authority: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"agent", authority.key().as_ref()],
+        bump = agent_config.bump,
+        has_one = authority,
+    )]
+    pub agent_config: Account<'info, AgentConfig>,
+}
+
 #[error_code]
 pub enum AssrError {
     #[msg("agent is paused")]
@@ -177,4 +253,8 @@ pub enum AssrError {
     FixtureIdTooLong,
     #[msg("direction must be 1 or -1")]
     InvalidDirection,
+    #[msg("signal has already been settled")]
+    SignalAlreadySettled,
+    #[msg("signal log does not belong to this agent")]
+    SignalNotOwnedByAgent,
 }
