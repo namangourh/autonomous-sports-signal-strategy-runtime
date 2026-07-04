@@ -37,6 +37,22 @@ function performancePda(programId: PublicKey, authority: PublicKey) {
   return PublicKey.findProgramAddressSync([Buffer.from("perf"), authority.toBuffer()], programId)[0];
 }
 
+export interface AgentConfigView {
+  active: boolean;
+  maxPosUsdc: number;
+  maxDrawdownBps: number;
+}
+
+export async function fetchAgentConfig(program: anchor.Program, authority: Keypair): Promise<AgentConfigView> {
+  const agentConfig = agentConfigPda(program.programId, authority.publicKey);
+  const account = await (program.account as any).agentConfig.fetch(agentConfig);
+  return {
+    active: account.active,
+    maxPosUsdc: (account.riskParams.maxPosUsdc as anchor.BN).toNumber(),
+    maxDrawdownBps: account.riskParams.maxDrawdownBps,
+  };
+}
+
 /** Idempotent: if this authority already has an AgentConfig on-chain, does nothing. */
 export async function ensureAgentInitialized(program: anchor.Program, authority: Keypair): Promise<void> {
   const agentConfig = agentConfigPda(program.programId, authority.publicKey);
@@ -76,19 +92,33 @@ function signalTypeToU8(signalType: StrategySignal["signalType"]): number {
   }
 }
 
+export async function emergencyPauseOnChain(program: anchor.Program, authority: Keypair): Promise<string> {
+  const agentConfig = agentConfigPda(program.programId, authority.publicKey);
+  return program.methods
+    .emergencyPause()
+    .accounts({
+      authority: authority.publicKey,
+      agentConfig,
+    })
+    .signers([authority])
+    .rpc();
+}
+
 /**
  * Logs a StrategySignal on-chain. `signalSeq` reuses the source event's
  * timestampMillis (see docs/oracle-hash-spec.md and the Rust doc-comment on
  * log_signal) so it's unique per (agent, fixture) without extra state.
  *
- * TODO(Day 5): size_usdc/execution_price are fixed placeholders — replace
- * with real Kelly sizing (src/risk/kellySizing.ts) and a paper/real fill
- * price once the execution layer exists.
+ * `sizeUsdcMicros` and `executionPriceMicros` are the caller's job to
+ * compute (Kelly sizing + a paper/real fill price) — this function is just
+ * the on-chain wrapper.
  */
 export async function logSignalOnChain(
   program: anchor.Program,
   authority: Keypair,
   signal: StrategySignal,
+  sizeUsdcMicros: number,
+  executionPriceMicros: number,
 ): Promise<string> {
   const agentConfig = agentConfigPda(program.programId, authority.publicKey);
   const signalSeq = new anchor.BN(signal.timestampMillis);
@@ -102,8 +132,6 @@ export async function logSignalOnChain(
     program.programId,
   );
 
-  const sizeUsdc = new anchor.BN(10_000_000);
-  const executionPrice = new anchor.BN(0);
   const oracleHash = Array.from(Buffer.from(signal.oracleHash, "hex"));
 
   return program.methods
@@ -112,9 +140,9 @@ export async function logSignalOnChain(
       signalSeq,
       signalTypeToU8(signal.signalType),
       signal.direction,
-      sizeUsdc,
+      new anchor.BN(Math.round(sizeUsdcMicros)),
       oracleHash,
-      executionPrice,
+      new anchor.BN(Math.round(executionPriceMicros)),
       PublicKey.default,
     )
     .accounts({

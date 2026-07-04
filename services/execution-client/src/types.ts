@@ -7,6 +7,8 @@ export interface StrategySignal {
   signalType: SignalType;
   direction: 1 | -1;
   edge: number;
+  /** Implied probability of the price being traded (1 / decimal odds) — the Kelly sizing input paired with edge. */
+  candidateImpliedProb: number;
   oracleHash: string;
   timestampMillis: number;
 }

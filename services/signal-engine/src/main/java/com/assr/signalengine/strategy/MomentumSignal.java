@@ -63,6 +63,7 @@ public class MomentumSignal implements Strategy {
                         id(), event.fixtureId(), SignalType.MOMENTUM,
                         homeOdds < oldest.homeOdds() ? 1 : -1,
                         Math.abs(homeOdds - oldest.homeOdds()) / oldest.homeOdds(),
+                        1.0 / homeOdds,
                         event.oracleHash(), event.timestampMillis()));
 
         history.addLast(new Sample(event.timestampMillis(), homeOdds));

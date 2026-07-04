@@ -53,10 +53,12 @@ public class ValueBetDetector implements Strategy {
                     benchmark.get("draw").asDouble(),
                     benchmark.get("away").asDouble());
 
-            double homeEdge = OddsDevigCalculator.edge(candidate.get("home").asDouble(), fair.home());
+            double candidateHomeOdds = candidate.get("home").asDouble();
+            double homeEdge = OddsDevigCalculator.edge(candidateHomeOdds, fair.home());
             if (homeEdge > EDGE_THRESHOLD) {
+                double candidateImpliedProb = 1.0 / candidateHomeOdds;
                 return Optional.of(new StrategySignal(
-                        id(), event.fixtureId(), SignalType.VALUE_BET, 1, homeEdge,
+                        id(), event.fixtureId(), SignalType.VALUE_BET, 1, homeEdge, candidateImpliedProb,
                         event.oracleHash(), event.timestampMillis()));
             }
         } catch (Exception e) {
