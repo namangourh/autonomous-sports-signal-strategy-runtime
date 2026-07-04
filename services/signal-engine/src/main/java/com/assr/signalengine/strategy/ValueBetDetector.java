@@ -42,8 +42,8 @@ public class ValueBetDetector implements Strategy {
         try {
             byte[] raw = Base64.getDecoder().decode(event.rawPayloadBase64());
             JsonNode root = objectMapper.readTree(raw);
-            JsonNode benchmark = findBook(root, BENCHMARK_BOOK);
-            JsonNode candidate = findBook(root, tradingBookName());
+            JsonNode benchmark = TxLinePayloadParser.findBook(root, BENCHMARK_BOOK);
+            JsonNode candidate = TxLinePayloadParser.findBook(root, tradingBookName());
             if (benchmark == null || candidate == null) {
                 return Optional.empty();
             }
@@ -66,19 +66,6 @@ public class ValueBetDetector implements Strategy {
             return Optional.empty();
         }
         return Optional.empty();
-    }
-
-    private JsonNode findBook(JsonNode root, String bookName) {
-        JsonNode books = root.get("books");
-        if (books == null) {
-            return null;
-        }
-        for (JsonNode book : books) {
-            if (bookName.equalsIgnoreCase(book.path("name").asText())) {
-                return book;
-            }
-        }
-        return null;
     }
 
     private String tradingBookName() {

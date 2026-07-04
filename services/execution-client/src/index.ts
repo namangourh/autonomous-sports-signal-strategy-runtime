@@ -7,6 +7,8 @@ import {
   logSignalOnChain,
 } from "./anchor-client/assrClient.js";
 import { getPaperFillQuote } from "./execution/jupiterClient.js";
+import { planAtomicBundle } from "./execution/jitoBundle.js";
+import { recordPaperTrade } from "./execution/paperTradeRecorder.js";
 import { calculatePositionSizeUsdc } from "./risk/kellySizing.js";
 import { isStale } from "./risk/riskManager.js";
 import { createCircuitBreakerGate } from "./risk/circuitBreakerGate.js";
@@ -78,12 +80,30 @@ async function main() {
         console.warn("Jupiter paper quote unavailable — logging with executionPrice=0");
       }
 
+      const bundlePlan = planAtomicBundle(signal);
+      console.log("atomic bundle plan:", bundlePlan);
+
       try {
-        const signature = await logSignalOnChain(program, authority, signal, sizeUsdcMicros, executionPriceMicros);
+        const { signature, signalLogPda } = await logSignalOnChain(
+          program,
+          authority,
+          signal,
+          sizeUsdcMicros,
+          executionPriceMicros,
+        );
         console.log(
           `logged on-chain: ${signature} size=$${(sizeUsdcMicros / 1_000_000).toFixed(2)} ` +
             `paperFillSolPrice=$${quote?.solPriceUsdc.toFixed(2) ?? "n/a"}`,
         );
+        recordPaperTrade({
+          signalPda: signalLogPda,
+          fixtureId: signal.fixtureId,
+          strategyId: signal.strategyId,
+          direction: signal.direction,
+          sizeUsdc: sizeUsdcMicros / 1_000_000,
+          assumedFillPrice: quote?.solPriceUsdc ?? 0,
+          logSignalTxSignature: signature,
+        });
       } catch (err) {
         console.error("failed to log signal on-chain", err);
       }

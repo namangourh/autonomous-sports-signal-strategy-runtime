@@ -119,7 +119,7 @@ export async function logSignalOnChain(
   signal: StrategySignal,
   sizeUsdcMicros: number,
   executionPriceMicros: number,
-): Promise<string> {
+): Promise<{ signature: string; signalLogPda: string }> {
   const agentConfig = agentConfigPda(program.programId, authority.publicKey);
   const signalSeq = new anchor.BN(signal.timestampMillis);
   const [signalLog] = PublicKey.findProgramAddressSync(
@@ -134,7 +134,7 @@ export async function logSignalOnChain(
 
   const oracleHash = Array.from(Buffer.from(signal.oracleHash, "hex"));
 
-  return program.methods
+  const signature = await program.methods
     .logSignal(
       signal.fixtureId,
       signalSeq,
@@ -153,4 +153,6 @@ export async function logSignalOnChain(
     })
     .signers([authority])
     .rpc();
+
+  return { signature, signalLogPda: signalLog.toBase58() };
 }

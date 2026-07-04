@@ -19,7 +19,9 @@ import java.util.concurrent.ConcurrentMap;
  * per-fixture in-memory history; fine for a single-instance signal engine,
  * would need externalizing (e.g. to the database) if this ever scales out.
  *
- * TODO: field name ("home") is a placeholder pending real TxLINE /odds docs.
+ * Tracks the "txline" book's price (see TxLinePayloadParser) — the same
+ * book ValueBetDetector trades against — since that's the price we'd
+ * actually be filling at.
  */
 @Component
 public class MomentumSignal implements Strategy {
@@ -80,8 +82,12 @@ public class MomentumSignal implements Strategy {
         try {
             byte[] raw = Base64.getDecoder().decode(event.rawPayloadBase64());
             JsonNode root = objectMapper.readTree(raw);
-            JsonNode home = root.at("/home");
-            return home.isMissingNode() ? null : home.asDouble();
+            JsonNode txline = TxLinePayloadParser.findBook(root, "txline");
+            if (txline == null) {
+                return null;
+            }
+            JsonNode home = txline.get("home");
+            return home == null ? null : home.asDouble();
         } catch (Exception e) {
             return null;
         }
