@@ -5,10 +5,10 @@ package_manager = "npm"
 resolution = true
 skip-lint = false
 
-[programs.localnet]
-assr_v1 = "82uF2pCgDACbpuXW1tDSDCQJ7PYUKtETE1GoRSAL4Tdj"
-
 [programs.devnet]
+assr_v1 = "2QwzfNdZx8DGbeu6VbSzcn9jaNidstZbC2XRL8Vy9ZrB"
+
+[programs.localnet]
 assr_v1 = "82uF2pCgDACbpuXW1tDSDCQJ7PYUKtETE1GoRSAL4Tdj"
 
 [registry]
