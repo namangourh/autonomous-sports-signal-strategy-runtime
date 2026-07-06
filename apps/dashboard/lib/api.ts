@@ -16,15 +16,14 @@ export interface PerformanceRecord {
   lossCount: number;
 }
 
-// TODO: these hit REST endpoints that don't exist yet — see Day 7 (services/signal-engine api package).
 export async function fetchSignals(agentId: string): Promise<SignalRecord[]> {
-  const res = await fetch(`${SIGNAL_ENGINE_BASE_URL}/api/v1/agent/${agentId}/signals`);
+  const res = await fetch(`${SIGNAL_ENGINE_BASE_URL}/api/v1/agent/${agentId}/signals`, { cache: "no-store" });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function fetchPerformance(agentId: string): Promise<PerformanceRecord | null> {
-  const res = await fetch(`${SIGNAL_ENGINE_BASE_URL}/api/v1/agent/${agentId}/performance`);
+  const res = await fetch(`${SIGNAL_ENGINE_BASE_URL}/api/v1/agent/${agentId}/performance`, { cache: "no-store" });
   if (!res.ok) return null;
   return res.json();
 }

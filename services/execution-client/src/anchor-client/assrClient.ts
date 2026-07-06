@@ -79,7 +79,7 @@ export async function ensureAgentInitialized(program: anchor.Program, authority:
     .rpc();
 }
 
-function signalTypeToU8(signalType: StrategySignal["signalType"]): number {
+export function signalTypeToU8(signalType: StrategySignal["signalType"]): number {
   switch (signalType) {
     case "VALUE_BET":
       return 1;
@@ -90,6 +90,19 @@ function signalTypeToU8(signalType: StrategySignal["signalType"]): number {
     default:
       throw new Error(`unknown signal type: ${signalType}`);
   }
+}
+
+/**
+ * Different strategies can both fire on the very same raw event, sharing
+ * fixtureId and timestampMillis — using timestampMillis alone as signal_seq
+ * would make their SignalLog PDAs collide (same agent + fixture + seq), so
+ * the second log_signal call would fail. Folding in the signal-type code
+ * (1-9, same numbering as the on-chain signal_type byte) disambiguates them
+ * while staying roughly time-ordered. Mirrored in apps/dashboard/lib/solana.ts
+ * for PDA derivation there — keep both in sync if this changes.
+ */
+export function signalSeqFor(timestampMillis: number, signalType: StrategySignal["signalType"]): anchor.BN {
+  return new anchor.BN(timestampMillis).muln(10).addn(signalTypeToU8(signalType));
 }
 
 export async function emergencyPauseOnChain(program: anchor.Program, authority: Keypair): Promise<string> {
@@ -105,9 +118,9 @@ export async function emergencyPauseOnChain(program: anchor.Program, authority: 
 }
 
 /**
- * Logs a StrategySignal on-chain. `signalSeq` reuses the source event's
- * timestampMillis (see docs/oracle-hash-spec.md and the Rust doc-comment on
- * log_signal) so it's unique per (agent, fixture) without extra state.
+ * Logs a StrategySignal on-chain. `signalSeq` is derived from the source
+ * event's timestampMillis plus the signal-type code (see signalSeqFor) so
+ * it's unique per (agent, fixture, strategy) without extra state.
  *
  * `sizeUsdcMicros` and `executionPriceMicros` are the caller's job to
  * compute (Kelly sizing + a paper/real fill price) — this function is just
@@ -121,7 +134,7 @@ export async function logSignalOnChain(
   executionPriceMicros: number,
 ): Promise<{ signature: string; signalLogPda: string }> {
   const agentConfig = agentConfigPda(program.programId, authority.publicKey);
-  const signalSeq = new anchor.BN(signal.timestampMillis);
+  const signalSeq = signalSeqFor(signal.timestampMillis, signal.signalType);
   const [signalLog] = PublicKey.findProgramAddressSync(
     [
       Buffer.from("signal"),
