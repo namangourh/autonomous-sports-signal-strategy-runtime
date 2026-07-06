@@ -22,3 +22,6 @@ txline:
   base-url: ${TXLINE_BASE_URL:https://txline-docs.txodds.com/api}
   api-key: ${TXLINE_API_KEY:}
   poll-interval-ms: ${TXLINE_POLL_INTERVAL_MS:60000}
+
+solana:
+  rpc-url: ${SOLANA_RPC_URL:https://api.devnet.solana.com}
