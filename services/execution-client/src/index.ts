@@ -41,7 +41,7 @@ async function main() {
   void circuitBreaker; // silence unused-until-a-settlement-feed-exists lint
 
   const kafka = new Kafka({ clientId: "execution-client", brokers: [KAFKA_BOOTSTRAP_SERVERS] });
-  const consumer = kafka.consumer({ groupId: "execution-client" });
+  const consumer = kafka.consumer({ groupId: process.env.KAFKA_CONSUMER_GROUP_ID ?? "execution-client" });
   await consumer.connect();
   // Not fromBeginning: a live trading system shouldn't act on a backlog of
   // historical signals on restart — isStale() would reject most of them
@@ -50,40 +50,43 @@ async function main() {
 
   await consumer.run({
     eachMessage: async ({ message }) => {
-      if (!message.value) return;
-      const signal: StrategySignal = JSON.parse(message.value.toString());
-      console.log(`received signal: ${signal.strategyId} ${signal.fixtureId} edge=${signal.edge}`);
-
-      if (isStale(signal.timestampMillis, MAX_STALE_MS)) {
-        console.warn(`skipping stale signal (age > ${MAX_STALE_MS}ms):`, signal.fixtureId);
-        return;
-      }
-      if (!agentConfig.active) {
-        console.warn("agent is paused — skipping signal");
-        return;
-      }
-
-      const sizeUsdcMicros = calculatePositionSizeUsdc(
-        signal.candidateImpliedProb,
-        signal.edge,
-        BANKROLL_USDC_MICROS,
-        agentConfig.maxPosUsdc,
-      );
-      if (sizeUsdcMicros <= 0) {
-        console.log("Kelly sizing returned 0 — skipping signal");
-        return;
-      }
-
-      const quote = await getPaperFillQuote(sizeUsdcMicros / 1_000_000);
-      const executionPriceMicros = quote ? Math.round(quote.solPriceUsdc * 1_000_000) : 0;
-      if (!quote) {
-        console.warn("Jupiter paper quote unavailable — logging with executionPrice=0");
-      }
-
-      const bundlePlan = planAtomicBundle(signal);
-      console.log("atomic bundle plan:", bundlePlan);
-
       try {
+        if (!message.value) return;
+        const signal: StrategySignal = JSON.parse(message.value.toString());
+        console.log(
+          `received signal: ${signal.strategyId} ${signal.fixtureId} type=${signal.signalType} ` +
+            `direction=${signal.direction} edge=${signal.edge} candidateImpliedProb=${signal.candidateImpliedProb}`,
+        );
+
+        if (isStale(signal.timestampMillis, MAX_STALE_MS)) {
+          console.warn(`skipping stale signal (age > ${MAX_STALE_MS}ms):`, signal.fixtureId);
+          return;
+        }
+        if (!agentConfig.active) {
+          console.warn("agent is paused — skipping signal");
+          return;
+        }
+
+        const sizeUsdcMicros = calculatePositionSizeUsdc(
+          signal.candidateImpliedProb,
+          signal.edge,
+          BANKROLL_USDC_MICROS,
+          agentConfig.maxPosUsdc,
+        );
+        if (sizeUsdcMicros <= 0) {
+          console.log(`Kelly sizing returned ${sizeUsdcMicros} — skipping signal`);
+          return;
+        }
+
+        const quote = await getPaperFillQuote(sizeUsdcMicros / 1_000_000);
+        const executionPriceMicros = quote ? Math.round(quote.solPriceUsdc * 1_000_000) : 0;
+        if (!quote) {
+          console.warn("Jupiter paper quote unavailable — logging with executionPrice=0");
+        }
+
+        const bundlePlan = planAtomicBundle(signal);
+        console.log("atomic bundle plan:", bundlePlan);
+
         const { signature, signalLogPda } = await logSignalOnChain(
           program,
           authority,
@@ -105,7 +108,7 @@ async function main() {
           logSignalTxSignature: signature,
         });
       } catch (err) {
-        console.error("failed to log signal on-chain", err);
+        console.error("failed to process signal message", err);
       }
     },
   });

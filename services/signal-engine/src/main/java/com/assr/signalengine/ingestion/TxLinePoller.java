@@ -61,6 +61,7 @@ public class TxLinePoller {
     public void pollActiveFixtures() {
         if (properties.isSimulate()) {
             publishSimulatedOddsSnapshot();
+            publishSimulatedScoreEventEvery(10);
             return;
         }
 
@@ -104,7 +105,7 @@ public class TxLinePoller {
      * window) rather than a static price that only ValueBetDetector reacts to.
      */
     private void publishSimulatedOddsSnapshot() {
-        double txlineHomeOdds = SIMULATED_BASE_HOME_ODDS + (simulationStep * SIMULATED_DRIFT_PER_POLL);
+        double txlineHomeOdds = currentSimulatedHomeOdds();
         simulationStep++;
 
         String payload = """
@@ -113,6 +114,30 @@ public class TxLinePoller {
                   {"name":"txline","home":%.4f,"draw":3.20,"away":4.00}
                 ]}""".formatted(txlineHomeOdds);
         publishEvent(SIMULATED_FIXTURE_ID, "ODDS_SNAPSHOT", payload.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Every {@code interval}-th poll, simulates a late goal (minute cycles
+     * through 60–90, scoring team alternates) so GoalImpactSignal has
+     * something to detect — the real /scores feed doesn't exist yet either.
+     */
+    private void publishSimulatedScoreEventEvery(int interval) {
+        if (simulationStep == 0 || simulationStep % interval != 0) {
+            return;
+        }
+
+        long cycle = simulationStep / interval;
+        int minute = 60 + (int) (cycle % 31);
+        String scoringTeam = (cycle % 2 == 0) ? "home" : "away";
+
+        String payload = """
+                {"minute":%d,"scoringTeam":"%s","candidateOdds":%.4f}""".formatted(
+                minute, scoringTeam, currentSimulatedHomeOdds());
+        publishEvent(SIMULATED_FIXTURE_ID, "SCORE_EVENT", payload.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private double currentSimulatedHomeOdds() {
+        return SIMULATED_BASE_HOME_ODDS + (simulationStep * SIMULATED_DRIFT_PER_POLL);
     }
 
     private void publishEvent(String fixtureId, String eventType, byte[] rawBody) {
