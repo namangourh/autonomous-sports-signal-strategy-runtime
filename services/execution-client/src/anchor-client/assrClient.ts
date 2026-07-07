@@ -7,13 +7,27 @@ import path from "node:path";
 import type { StrategySignal } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const IDL_PATH = path.resolve(__dirname, "../../../../target/idl/assr_v1.json");
+// Committed copy under src/idl/ (not the Anchor workspace's gitignored
+// target/idl/) so this service is self-contained for container builds —
+// re-copy it here after any program upgrade that changes the IDL.
+const IDL_PATH = path.resolve(__dirname, "../idl/assr_v1.json");
 
 function expandHome(p: string): string {
   return p.startsWith("~") ? path.join(homedir(), p.slice(1)) : p;
 }
 
+/**
+ * SOLANA_WALLET_SECRET_KEY (a JSON-array-of-bytes string, same shape as a
+ * standard Solana CLI keypair file) takes precedence for cloud deployment,
+ * where there's no local filesystem to read a keypair file from — set it as
+ * a secret env var, never commit it. Falls back to a local keypair file for
+ * dev. Never log the decoded secret.
+ */
 function loadWalletKeypair(): Keypair {
+  const inlineSecret = process.env.SOLANA_WALLET_SECRET_KEY;
+  if (inlineSecret) {
+    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(inlineSecret)));
+  }
   const keypairPath = expandHome(process.env.SOLANA_WALLET_KEYPAIR_PATH ?? "~/.config/solana/id.json");
   const secret = JSON.parse(readFileSync(keypairPath, "utf8"));
   return Keypair.fromSecretKey(Uint8Array.from(secret));

@@ -49,6 +49,10 @@ anchor test
 
 Per-service setup instructions live in each service's own directory.
 
+## Deployment
+
+See [docs/deployment.md](docs/deployment.md) for deploying the backend (Kafka, signal-engine, execution-client) and dashboard to the cloud.
+
 ## Status
 
 Early development — see the roadmap for what's implemented versus planned.

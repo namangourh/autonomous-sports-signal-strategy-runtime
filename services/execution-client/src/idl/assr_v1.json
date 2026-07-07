@@ -1,0 +1,567 @@
+{
+  "address": "2QwzfNdZx8DGbeu6VbSzcn9jaNidstZbC2XRL8Vy9ZrB",
+  "metadata": {
+    "name": "assr_v1",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "emergency_pause",
+      "docs": [
+        "One-way kill switch: pauses the agent so log_signal starts rejecting",
+        "new signals. There is no resume instruction in this version — the",
+        "operator re-initializes with a fresh agent if the pause was a mistake."
+      ],
+      "discriminator": [
+        21,
+        143,
+        27,
+        142,
+        200,
+        181,
+        210,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "agent_config"
+          ]
+        },
+        {
+          "name": "agent_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_agent",
+      "discriminator": [
+        212,
+        81,
+        156,
+        211,
+        212,
+        110,
+        21,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "agent_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "performance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  101,
+                  114,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "strategy_id",
+          "type": "u64"
+        },
+        {
+          "name": "risk_params",
+          "type": {
+            "defined": {
+              "name": "RiskParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "log_signal",
+      "docs": [
+        "`signal_seq` is caller-supplied (the execution client uses the source",
+        "event's timestamp_millis) and must be unique per (agent, fixture_id) —",
+        "reusing one fails account creation rather than overwriting, since",
+        "signal logs are append-only."
+      ],
+      "discriminator": [
+        141,
+        115,
+        34,
+        17,
+        189,
+        22,
+        91,
+        220
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "agent_config"
+          ]
+        },
+        {
+          "name": "agent_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signal_log",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  105,
+                  103,
+                  110,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "fixture_id"
+              },
+              {
+                "kind": "arg",
+                "path": "signal_seq"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "fixture_id",
+          "type": "string"
+        },
+        {
+          "name": "signal_seq",
+          "type": "u64"
+        },
+        {
+          "name": "signal_type",
+          "type": "u8"
+        },
+        {
+          "name": "direction",
+          "type": "i8"
+        },
+        {
+          "name": "size_usdc",
+          "type": "u64"
+        },
+        {
+          "name": "oracle_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "execution_price",
+          "type": "u64"
+        },
+        {
+          "name": "tx_signature",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_performance",
+      "docs": [
+        "Settles a previously logged signal's realized P&L against the",
+        "agent's performance record. Each signal can only be settled once."
+      ],
+      "discriminator": [
+        11,
+        251,
+        66,
+        148,
+        20,
+        86,
+        149,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "agent_config"
+          ]
+        },
+        {
+          "name": "agent_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "performance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  101,
+                  114,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signal_log",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "realized_pnl_usdc",
+          "type": "i64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AgentConfig",
+      "discriminator": [
+        253,
+        238,
+        178,
+        11,
+        45,
+        187,
+        48,
+        224
+      ]
+    },
+    {
+      "name": "PerformancePda",
+      "discriminator": [
+        78,
+        99,
+        251,
+        3,
+        215,
+        254,
+        87,
+        234
+      ]
+    },
+    {
+      "name": "SignalLog",
+      "discriminator": [
+        14,
+        197,
+        14,
+        228,
+        237,
+        179,
+        154,
+        230
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AgentPaused",
+      "msg": "agent is paused"
+    },
+    {
+      "code": 6001,
+      "name": "FixtureIdTooLong",
+      "msg": "fixture id too long"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidDirection",
+      "msg": "direction must be 1 or -1"
+    },
+    {
+      "code": 6003,
+      "name": "SignalAlreadySettled",
+      "msg": "signal has already been settled"
+    },
+    {
+      "code": 6004,
+      "name": "SignalNotOwnedByAgent",
+      "msg": "signal log does not belong to this agent"
+    }
+  ],
+  "types": [
+    {
+      "name": "AgentConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "strategy_id",
+            "type": "u64"
+          },
+          {
+            "name": "risk_params",
+            "type": {
+              "defined": {
+                "name": "RiskParams"
+              }
+            }
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerformancePda",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_signals",
+            "type": "u64"
+          },
+          {
+            "name": "cumulative_pnl_usdc",
+            "type": "i64"
+          },
+          {
+            "name": "win_count",
+            "type": "u64"
+          },
+          {
+            "name": "loss_count",
+            "type": "u64"
+          },
+          {
+            "name": "max_drawdown_bps",
+            "type": "u16"
+          },
+          {
+            "name": "peak_pnl_usdc",
+            "type": "i64"
+          },
+          {
+            "name": "last_updated",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RiskParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_pos_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "max_drawdown_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SignalLog",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "fixture_id",
+            "type": "string"
+          },
+          {
+            "name": "signal_seq",
+            "type": "u64"
+          },
+          {
+            "name": "signal_type",
+            "type": "u8"
+          },
+          {
+            "name": "direction",
+            "type": "i8"
+          },
+          {
+            "name": "size_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "oracle_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "signal_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "execution_price",
+            "type": "u64"
+          },
+          {
+            "name": "tx_signature",
+            "type": "pubkey"
+          },
+          {
+            "name": "settled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
